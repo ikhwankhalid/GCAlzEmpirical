@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(python -c:*)",
+      "Bash(python -m py_compile:*)",
+      "Skill(brainstorming)",
+      "Skill(scientific-critical-thinking)",
+      "Bash(NUL)",
+      "Bash(jupyter nbconvert:*)",
+      "Bash(python:*)",
+      "Bash(find:*)",
+      "Bash(dir:*)",
+      "Bash(grep:*)",
+      "Bash(done)",
+      "Bash(more:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
