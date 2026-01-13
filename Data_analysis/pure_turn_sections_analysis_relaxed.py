@@ -45,7 +45,7 @@ plt.rcParams['figure.dpi'] = 100
 # =============================================================================
 
 # Paths
-PROJECT_DATA_PATH = 'E:\\GitHub\\Peng_et.al_2025_noInt\\Peng'
+PROJECT_DATA_PATH = '/workspace/Peng'
 
 # Sessions to use (from setup_project.py)
 useAble = ['jp486-19032023-0108', 'jp486-18032023-0108',
@@ -1093,6 +1093,95 @@ def per_animal_regression(endpoints, min_sections=10):
     return pd.DataFrame(results)
 
 
+def per_animal_regression_by_condition(endpoints, conditions, speed_thresholds, min_sections=10):
+    """
+    Run per-animal regression separately for each condition and speed threshold.
+
+    This enables creation of per-animal figures for each condition and
+    cross-animal forest plots comparing beta estimates.
+
+    Parameters
+    ----------
+    endpoints : DataFrame
+        Endpoint data with integrated_ang_vel, mvtDirError, condition, speed_threshold
+    conditions : list
+        List of condition names
+    speed_thresholds : list
+        List of speed thresholds
+    min_sections : int
+        Minimum sections required per animal/condition/speed combination
+
+    Returns
+    -------
+    results_df : DataFrame
+        Per-animal-condition regression results with columns:
+        animal_id, condition, speed_threshold, n_sections, beta, se,
+        ci_lower, ci_upper, r_squared, p_value
+    """
+    from scipy.stats import t as t_dist
+
+    # Add animal_id if not present
+    data = endpoints.copy()
+    if 'animal_id' not in data.columns:
+        if 'session' in data.columns:
+            data['animal_id'] = data['session'].apply(extract_animal_id)
+        elif 'trial_id' in data.columns:
+            data['animal_id'] = data['trial_id'].apply(
+                lambda x: extract_animal_id(x.split('_')[0]))
+        else:
+            print("Warning: Cannot extract animal_id from data")
+            return pd.DataFrame()
+
+    results = []
+
+    for condition in conditions:
+        for speed in speed_thresholds:
+            # Filter to this condition/speed
+            mask = (data['condition'] == condition) & (data['speed_threshold'] == speed)
+            cond_data = data[mask]
+
+            if len(cond_data) == 0:
+                continue
+
+            for animal_id in cond_data['animal_id'].unique():
+                animal_data = cond_data[cond_data['animal_id'] == animal_id]
+
+                X = animal_data['integrated_ang_vel'].values
+                Y = animal_data['mvtDirError'].values
+                valid = ~(np.isnan(X) | np.isnan(Y))
+                X, Y = X[valid], Y[valid]
+
+                if len(X) >= min_sections:
+                    slope, intercept, r, p, se = stats.linregress(X, Y)
+
+                    # Compute analytical 95% CI
+                    df = len(X) - 2
+                    if df > 0:
+                        t_crit = t_dist.ppf(0.975, df)
+                        ci_lower = slope - t_crit * se
+                        ci_upper = slope + t_crit * se
+                    else:
+                        ci_lower = np.nan
+                        ci_upper = np.nan
+
+                    results.append({
+                        'animal_id': animal_id,
+                        'condition': condition,
+                        'speed_threshold': speed,
+                        'n_sections': len(X),
+                        'beta': slope,
+                        'se': se,
+                        'ci_lower': ci_lower,
+                        'ci_upper': ci_upper,
+                        'r_squared': r**2,
+                        'r': r,
+                        'p_value': p,
+                        'intercept': intercept
+                    })
+
+    return pd.DataFrame(results)
+
+
 def compute_model_comparison(endpoints, condition_filter=None, speed_filter=None):
     """
     Compare R² across different modeling approaches.
@@ -1871,6 +1960,31 @@ if __name__ == "__main__":
             per_animal_results.to_csv(per_animal_fn, index=False)
             print(f"\n  Saved to: {per_animal_fn}")
 
+        # Per-animal regression by condition (for per-animal figures and forest plots)
+        print("\n" + "-"*60)
+        print("PER-ANIMAL REGRESSION BY CONDITION")
+        print("-"*60)
+
+        per_animal_by_condition = per_animal_regression_by_condition(
+            all_endpoint_data, CONDITIONS, SPEED_THRESHOLDS, min_sections=5
+        )
+
+        if len(per_animal_by_condition) > 0:
+            per_animal_cond_fn = os.path.join(results_dir, "pure_turn_section_per_animal_by_condition_relaxed.csv")
+            per_animal_by_condition.to_csv(per_animal_cond_fn, index=False)
+            print(f"\n  Saved to: {per_animal_cond_fn}")
+            print(f"  Total rows: {len(per_animal_by_condition)}")
+            print(f"  Animals: {per_animal_by_condition['animal_id'].nunique()}")
+            print(f"  Conditions: {per_animal_by_condition['condition'].nunique()}")
+
+            # Summary by animal
+            print("\n  Rows per animal:")
+            for animal_id in sorted(per_animal_by_condition['animal_id'].unique()):
+                n_rows = len(per_animal_by_condition[per_animal_by_condition['animal_id'] == animal_id])
+                print(f"    {animal_id}: {n_rows} condition-speed combinations")
+        else:
+            print("\n  Warning: No per-animal-by-condition results generated")
+
         # Mixed effects analysis across all data
         print("\n" + "-"*60)
         print("MIXED EFFECTS MODEL RESULTS (ALL DATA POOLED)")
@@ -1968,5 +2082,6 @@ if __name__ == "__main__":
     print(f"  - pure_turn_section_endpoints_relaxed.csv (one row per section)")
     print(f"  - pure_turn_section_endpoints_regression_relaxed.csv (regression stats)")
     print(f"  - pure_turn_section_per_animal_relaxed.csv (per-animal regression)")
+    print(f"  - pure_turn_section_per_animal_by_condition_relaxed.csv (per-animal by condition)")
     print(f"  - pure_turn_section_mixed_effects_relaxed.csv (mixed effects model)")
     print(f"  - pure_turn_section_model_comparison_relaxed.csv (R^2 comparison)")

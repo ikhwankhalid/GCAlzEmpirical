@@ -32,7 +32,7 @@ plt.rcParams['figure.dpi'] = 150
 # =============================================================================
 
 # Paths
-PROJECT_DATA_PATH = 'E:\\GitHub\\Peng_et.al_2025_noInt\\Peng'
+PROJECT_DATA_PATH = '/workspace/Peng'
 RESULTS_PATH = os.path.join(PROJECT_DATA_PATH, "results")
 FIGURES_PATH = os.path.join(PROJECT_DATA_PATH, "figures")
 
