@@ -339,7 +339,7 @@ def create_publication_figure():
         table[(0, j)].set_text_props(fontweight='bold', color='white')
         table[(0, j)].set_facecolor('#404040')
 
-    ax.set_title('D  Statistical Evidence Synthesis (speed ≥ 5.0 cm/s)',
+    ax.set_title('D  Statistical Tests (speed ≥ 5.0 cm/s)',
                  fontsize=13, fontweight='bold', loc='left', pad=5, y=0.92)
 
     # Add significance legend
